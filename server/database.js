@@ -13,6 +13,7 @@ if (!fs.existsSync(UPLOADS_PATH)) {
 // Setup connection pool. Configure DATABASE_URL in your .env file.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/aura',
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
 });
 
 console.log('📡 Database connection string:', (process.env.DATABASE_URL || 'FALLBACK').replace(/:[^@]+@/, ':****@'));
