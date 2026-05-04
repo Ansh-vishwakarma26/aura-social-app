@@ -28,11 +28,18 @@ export const CreatePost = () => {
     if (!caption.trim()) { setError("Please write something for your post."); return; }
     setError(""); setSubmitting(true);
     try {
+      console.log("🚀 Creating new post...");
       const form = new FormData();
       form.append("caption", caption.trim());
       form.append("isCloseFriends", String(isCloseFriends));
-      if (file) form.append("image", file);
+      if (file) {
+        console.log("📎 Appending image file...");
+        form.append("image", file);
+      }
+      
+      console.log("📤 Sending post request to /api/posts...");
       await api.upload("/posts", form);
+      console.log("✅ Post created!");
       navigate("/");
     } catch (e: any) {
       setError(e.message);

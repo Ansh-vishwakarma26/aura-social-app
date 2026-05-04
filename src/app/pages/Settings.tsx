@@ -83,8 +83,10 @@ export const Settings = () => {
   };
 
   const handleSave = async () => {
+    console.log("💾 Save button clicked");
     setSaving(true); setSaveMsg(null);
     try {
+      console.log("📦 Preparing form data...");
       const form = new FormData();
       form.append('fullName', fullName);
       form.append('username', username);
@@ -101,7 +103,10 @@ export const Settings = () => {
         form.append('coverImage', coverColor);
       }
       if (avatarFile) form.append('avatar', avatarFile);
+      
+      console.log("🚀 Sending update request to /users/me...");
       const data = await api.uploadPut<{ user: any }>('/users/me', form);
+      console.log("✅ Update successful:", data);
       updateUser(data.user);
       setSaveMsg({ type: 'success', text: 'Profile updated successfully!' });
     } catch (e: any) {

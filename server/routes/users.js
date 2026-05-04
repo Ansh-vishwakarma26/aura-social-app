@@ -66,17 +66,21 @@ router.put('/me', authenticate, upload.fields([{ name: 'avatar', maxCount: 1 }, 
 
   if (avatarFile) {
     try {
+      console.log('☁️ Uploading avatar to Cloudinary...');
       avatarUrl = await uploadToCloudinary(avatarFile, 'aura_avatars');
+      console.log('✅ Avatar uploaded:', avatarUrl);
     } catch (err) {
-      console.error('Cloudinary avatar upload error:', err);
+      console.error('❌ Cloudinary avatar upload error:', err);
     }
   }
 
   if (coverFile) {
     try {
+      console.log('☁️ Uploading cover to Cloudinary...');
       coverUrl = await uploadToCloudinary(coverFile, 'aura_covers');
+      console.log('✅ Cover uploaded:', coverUrl);
     } catch (err) {
-      console.error('Cloudinary cover upload error:', err);
+      console.error('❌ Cloudinary cover upload error:', err);
     }
   }
 

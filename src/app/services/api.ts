@@ -11,7 +11,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
 
-  const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+  const url = `${API_URL}${endpoint}`;
+  console.log(`🌐 API Request: ${options.method || 'GET'} ${url}`);
+  const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {

@@ -122,9 +122,11 @@ router.post('/', authenticate, upload.single('image'), async (req, res) => {
   let imageUrl = req.body.imageUrl || '';
   if (req.file) {
     try {
+      console.log('☁️ Uploading post image to Cloudinary...');
       imageUrl = await uploadToCloudinary(req.file, 'aura_posts');
+      console.log('✅ Post image uploaded:', imageUrl);
     } catch (err) {
-      console.error('Cloudinary post upload error:', err);
+      console.error('❌ Cloudinary post upload error:', err);
     }
   }
   const closeFriendsFlag = isCloseFriends === 'true' || isCloseFriends === true ? 1 : 0;
