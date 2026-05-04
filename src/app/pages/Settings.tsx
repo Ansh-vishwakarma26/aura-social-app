@@ -4,7 +4,7 @@ import { LogOut, User, Lock, ChevronRight, Moon, Shield, Zap, Camera, AlertCircl
 import { useTheme } from "next-themes";
 import { api } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { Avatar } from "../components/ui/Avatar2";
+import { Avatar } from "../components/ui/Avatar";
 import { Button } from "../components/ui/Button";
 import { cn } from "../lib/utils";
 
