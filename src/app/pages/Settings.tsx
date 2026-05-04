@@ -18,6 +18,7 @@ export const Settings = () => {
   const [showMBTISelector, setShowMBTISelector] = useState(false);
   const [bio, setBio] = useState(user?.bio || '');
   const [fullName, setFullName] = useState(user?.fullName || '');
+  const [username, setUsername] = useState(user?.username || '');
   const [isPrivate, setIsPrivate] = useState(user?.isPrivate || false);
   const [pushEnabled, setPushEnabled] = useState(user?.pushEnabled ?? true);
   const [emailEnabled, setEmailEnabled] = useState(user?.emailEnabled ?? true);
@@ -86,6 +87,7 @@ export const Settings = () => {
     try {
       const form = new FormData();
       form.append('fullName', fullName);
+      form.append('username', username);
       form.append('bio', bio);
       form.append('mbti', selectedMBTI);
       form.append('isPrivate', String(isPrivate));
@@ -170,9 +172,18 @@ export const Settings = () => {
             <input
               value={fullName}
               onChange={e => setFullName(e.target.value)}
+              placeholder="Full Name"
               className="text-center text-xl font-bold text-zinc-900 dark:text-white bg-transparent border-b border-transparent hover:border-zinc-200 dark:hover:border-white/20 focus:border-emerald-500 focus:outline-none transition-colors w-full"
             />
-            <p className="text-center text-zinc-500 dark:text-zinc-400">@{user.username}</p>
+            <div className="flex items-center justify-center gap-1 text-zinc-500 dark:text-zinc-400">
+              <span>@</span>
+              <input
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="username"
+                className="bg-transparent border-b border-transparent hover:border-zinc-200 dark:hover:border-white/20 focus:border-emerald-500 focus:outline-none transition-colors w-32"
+              />
+            </div>
           </div>
         </div>
 

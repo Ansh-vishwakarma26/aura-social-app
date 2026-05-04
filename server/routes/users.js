@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const path = require('path');
 const multer = require('multer');
-const { db, formatUser, sendNotification } = require('../database');
+const { pool, formatUser, sendNotification } = require('../database');
 const { authenticate, optionalAuth } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 
@@ -12,36 +12,39 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 // GET /api/users/search?q=
-router.get('/search', optionalAuth, (req, res) => {
+router.get('/search', optionalAuth, async (req, res) => {
   const q = `%${req.query.q || ''}%`;
   const uid = req.user ? req.user.id : 0;
-  const users = db.prepare(`
+  const result = await pool.query(`
     SELECT * FROM users 
-    WHERE (username LIKE ? OR full_name LIKE ?) 
-    AND id != ? 
-    AND id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = ?)
-    AND id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = ?)
+    WHERE (username ILIKE $1 OR full_name ILIKE $1) 
+    AND id != $2 
+    AND id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = $2)
+    AND id NOT IN (SELECT blocker_id FROM blocks WHERE blocked_id = $2)
     LIMIT 20
-  `).all(q, q, uid, uid, uid);
-  res.json({ users: users.map(u => formatUser(u, req.user?.id)) });
+  `, [q, uid]);
+  
+  const users = await Promise.all(result.rows.map(u => formatUser(u, req.user?.id)));
+  res.json({ users });
 });
 
 // GET /api/users/:username
-router.get('/:username', optionalAuth, (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(req.params.username);
+router.get('/:username', optionalAuth, async (req, res) => {
+  const result = await pool.query('SELECT * FROM users WHERE username = $1', [req.params.username]);
+  const user = result.rows[0];
   if (!user) return res.status(404).json({ message: 'User not found' });
 
   if (req.user) {
-    const isBlocked = db.prepare('SELECT 1 FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)').get(req.user.id, user.id, user.id, req.user.id);
-    if (isBlocked) return res.json({ isBlocked: true });
+    const isBlocked = await pool.query('SELECT 1 FROM blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)', [req.user.id, user.id]);
+    if (isBlocked.rowCount > 0) return res.json({ isBlocked: true });
   }
 
-  res.json({ user: formatUser(user, req.user?.id) });
+  res.json({ user: await formatUser(user, req.user?.id) });
 });
 
 // PUT /api/users/me  — update profile
-router.put('/me', authenticate, upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), (req, res) => {
-  const { fullName, bio, mbti, coverImage } = req.body;
+router.put('/me', authenticate, upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), async (req, res) => {
+  const { fullName, username, bio, mbti, coverImage } = req.body;
   
   const avatarFile = req.files?.['avatar']?.[0];
   const coverFile = req.files?.['cover']?.[0];
@@ -50,21 +53,32 @@ router.put('/me', authenticate, upload.fields([{ name: 'avatar', maxCount: 1 }, 
   const coverUrl = coverFile ? `/uploads/${coverFile.filename}` : coverImage;
 
   const current = req.user;
-  db.prepare(`
+
+  // If username is changing, check for uniqueness
+  if (username && username !== current.username) {
+    const existing = await pool.query('SELECT id FROM users WHERE username = $1', [username]);
+    if (existing.rowCount > 0) {
+      return res.status(409).json({ message: 'Username already taken' });
+    }
+  }
+
+  await pool.query(`
     UPDATE users SET
-      full_name = ?,
-      bio = ?,
-      mbti = ?,
-      cover_image_url = ?,
-      avatar_url = COALESCE(?, avatar_url),
-      is_private = ?,
-      push_enabled = ?,
-      email_enabled = ?,
-      quiet_mode = ?,
-      activity_status_enabled = ?
-    WHERE id = ?
-  `).run(
+      full_name = $1,
+      username = $2,
+      bio = $3,
+      mbti = $4,
+      cover_image_url = $5,
+      avatar_url = COALESCE($6, avatar_url),
+      is_private = $7,
+      push_enabled = $8,
+      email_enabled = $9,
+      quiet_mode = $10,
+      activity_status_enabled = $11
+    WHERE id = $12
+  `, [
     fullName || current.full_name,
+    username || current.username,
     bio !== undefined ? bio : current.bio,
     mbti || current.mbti,
     coverUrl !== undefined ? coverUrl : current.cover_image_url,
@@ -75,10 +89,10 @@ router.put('/me', authenticate, upload.fields([{ name: 'avatar', maxCount: 1 }, 
     req.body.quietMode !== undefined ? (req.body.quietMode === 'true' || req.body.quietMode === true ? 1 : 0) : current.quiet_mode,
     req.body.activityStatusEnabled !== undefined ? (req.body.activityStatusEnabled === 'true' || req.body.activityStatusEnabled === true ? 1 : 0) : current.activity_status_enabled,
     current.id
-  );
+  ]);
 
-  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(current.id);
-  res.json({ user: formatUser(updated, current.id) });
+  const updatedRes = await pool.query('SELECT * FROM users WHERE id = $1', [current.id]);
+  res.json({ user: await formatUser(updatedRes.rows[0], current.id) });
 });
 
 // PUT /api/users/password
@@ -86,124 +100,150 @@ router.put('/password', authenticate, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) return res.status(400).json({ message: 'Both current and new password are required' });
   
-  const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
+  const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+  const user = result.rows[0];
   const isValid = await bcrypt.compare(currentPassword, user.password_hash);
   if (!isValid) return res.status(400).json({ message: 'Incorrect current password' });
   
   const hashed = await bcrypt.hash(newPassword, 10);
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashed, req.user.id);
+  await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hashed, req.user.id]);
   res.json({ success: true });
 });
 
 // GET /api/users/:username/followers
-router.get('/:username/followers', optionalAuth, (req, res) => {
-  const user = db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+router.get('/:username/followers', optionalAuth, async (req, res) => {
+  const userRes = await pool.query('SELECT id FROM users WHERE username = $1', [req.params.username]);
+  const user = userRes.rows[0];
   if (!user) return res.status(404).json({ message: 'User not found' });
-  const followers = db.prepare(`
+  
+  const result = await pool.query(`
     SELECT u.* FROM users u
     JOIN follows f ON f.follower_id = u.id
-    WHERE f.following_id = ?
+    WHERE f.following_id = $1
     ORDER BY f.created_at DESC
-  `).all(user.id);
-  res.json({ users: followers.map(u => formatUser(u, req.user?.id)) });
+  `, [user.id]);
+  
+  const users = await Promise.all(result.rows.map(u => formatUser(u, req.user?.id)));
+  res.json({ users });
 });
 
 // GET /api/users/:username/following
-router.get('/:username/following', optionalAuth, (req, res) => {
-  const user = db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+router.get('/:username/following', optionalAuth, async (req, res) => {
+  const userRes = await pool.query('SELECT id FROM users WHERE username = $1', [req.params.username]);
+  const user = userRes.rows[0];
   if (!user) return res.status(404).json({ message: 'User not found' });
-  const following = db.prepare(`
+  
+  const result = await pool.query(`
     SELECT u.* FROM users u
     JOIN follows f ON f.following_id = u.id
-    WHERE f.follower_id = ?
+    WHERE f.follower_id = $1
     ORDER BY f.created_at DESC
-  `).all(user.id);
-  res.json({ users: following.map(u => formatUser(u, req.user?.id)) });
+  `, [user.id]);
+  
+  const users = await Promise.all(result.rows.map(u => formatUser(u, req.user?.id)));
+  res.json({ users });
 });
 
 // POST /api/users/:username/follow
-router.post('/:username/follow', authenticate, (req, res) => {
-  const target = db.prepare('SELECT * FROM users WHERE username = ?').get(req.params.username);
+router.post('/:username/follow', authenticate, async (req, res) => {
+  const targetRes = await pool.query('SELECT * FROM users WHERE username = $1', [req.params.username]);
+  const target = targetRes.rows[0];
   if (!target) return res.status(404).json({ message: 'User not found' });
   if (target.id === req.user.id) return res.status(400).json({ message: 'Cannot follow yourself' });
 
   // Check if already following
-  const isFollowing = db.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(req.user.id, target.id);
-  if (isFollowing) return res.json({ success: true, isFollowing: true });
+  const isFollowing = await pool.query('SELECT 1 FROM follows WHERE follower_id = $1 AND following_id = $2', [req.user.id, target.id]);
+  if (isFollowing.rowCount > 0) return res.json({ success: true, isFollowing: true });
 
   if (target.is_private) {
     // Check if request already exists
-    const existingReq = db.prepare('SELECT 1 FROM follow_requests WHERE requester_id = ? AND target_id = ?').get(req.user.id, target.id);
-    if (existingReq) return res.json({ success: true, isRequested: true });
+    const existingReq = await pool.query('SELECT 1 FROM follow_requests WHERE requester_id = $1 AND target_id = $2', [req.user.id, target.id]);
+    if (existingReq.rowCount > 0) return res.json({ success: true, isRequested: true });
 
-    db.prepare('INSERT INTO follow_requests (requester_id, target_id) VALUES (?, ?)').run(req.user.id, target.id);
+    await pool.query('INSERT INTO follow_requests (requester_id, target_id) VALUES ($1, $2)', [req.user.id, target.id]);
     
     // Create follow request notification
-    sendNotification(target.id, req.user.id, 'follow_request');
+    await sendNotification(target.id, req.user.id, 'follow_request');
     
     return res.json({ success: true, isRequested: true });
   }
 
   try {
-    db.prepare('INSERT INTO follows (follower_id, following_id) VALUES (?, ?)').run(req.user.id, target.id);
+    await pool.query('INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.user.id, target.id]);
     // Create follow notification
-    sendNotification(target.id, req.user.id, 'follow');
+    await sendNotification(target.id, req.user.id, 'follow');
     res.json({ success: true, isFollowing: true });
-  } catch {
+  } catch (err) {
     res.json({ success: true, isFollowing: true });
   }
 });
 
 // DELETE /api/users/:username/follow
-router.delete('/:username/follow', authenticate, (req, res) => {
-  const target = db.prepare('SELECT * FROM users WHERE username = ?').get(req.params.username);
+router.delete('/:username/follow', authenticate, async (req, res) => {
+  const targetRes = await pool.query('SELECT * FROM users WHERE username = $1', [req.params.username]);
+  const target = targetRes.rows[0];
   if (!target) return res.status(404).json({ message: 'User not found' });
   
-  db.prepare('DELETE FROM follows WHERE follower_id = ? AND following_id = ?').run(req.user.id, target.id);
-  db.prepare('DELETE FROM follow_requests WHERE requester_id = ? AND target_id = ?').run(req.user.id, target.id);
+  await pool.query('DELETE FROM follows WHERE follower_id = $1 AND following_id = $2', [req.user.id, target.id]);
+  await pool.query('DELETE FROM follow_requests WHERE requester_id = $1 AND target_id = $2', [req.user.id, target.id]);
   
   res.json({ success: true, isFollowing: false, isRequested: false });
 });
 
 // GET /api/users/me/requests
-router.get('/me/requests', authenticate, (req, res) => {
-  const requests = db.prepare(`
+router.get('/me/requests', authenticate, async (req, res) => {
+  const result = await pool.query(`
     SELECT fr.id as requestId, u.* FROM follow_requests fr
     JOIN users u ON fr.requester_id = u.id
-    WHERE fr.target_id = ?
+    WHERE fr.target_id = $1
     ORDER BY fr.created_at DESC
-  `).all(req.user.id);
-  res.json({ requests: requests.map(r => ({ ...formatUser(r, req.user.id), requestId: r.requestId })) });
+  `, [req.user.id]);
+  
+  const requests = await Promise.all(result.rows.map(async r => {
+    const u = await formatUser(r, req.user.id);
+    return { ...u, requestId: r.requestid }; // Postgres lowercases unquoted aliases
+  }));
+  res.json({ requests });
 });
 
 // POST /api/users/requests/:id/accept
-router.post('/requests/:id/accept', authenticate, (req, res) => {
-  const request = db.prepare('SELECT * FROM follow_requests WHERE id = ? AND target_id = ?').get(req.params.id, req.user.id);
-  if (!request) return res.status(404).json({ message: 'Request not found' });
+router.post('/requests/:id/accept', authenticate, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const requestRes = await client.query('SELECT * FROM follow_requests WHERE id = $1 AND target_id = $2', [req.params.id, req.user.id]);
+    const request = requestRes.rows[0];
+    if (!request) return res.status(404).json({ message: 'Request not found' });
 
-  db.transaction(() => {
-    db.prepare('INSERT OR IGNORE INTO follows (follower_id, following_id) VALUES (?, ?)').run(request.requester_id, req.user.id);
-    db.prepare('DELETE FROM follow_requests WHERE id = ?').run(request.id);
+    await client.query('BEGIN');
+    await client.query('INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [request.requester_id, req.user.id]);
+    await client.query('DELETE FROM follow_requests WHERE id = $1', [request.id]);
     // Update notification from follow_request to follow
-    db.prepare(`
+    await client.query(`
       UPDATE notifications SET type = 'follow' 
-      WHERE recipient_id = ? AND actor_id = ? AND type = 'follow_request'
-    `).run(req.user.id, request.requester_id);
-  })();
+      WHERE recipient_id = $1 AND actor_id = $2 AND type = 'follow_request'
+    `, [req.user.id, request.requester_id]);
+    await client.query('COMMIT');
 
-  res.json({ success: true });
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ message: err.message });
+  } finally {
+    client.release();
+  }
 });
 
 // POST /api/users/requests/:id/decline
-router.post('/requests/:id/decline', authenticate, (req, res) => {
-  const request = db.prepare('SELECT * FROM follow_requests WHERE id = ? AND target_id = ?').get(req.params.id, req.user.id);
+router.post('/requests/:id/decline', authenticate, async (req, res) => {
+  const requestRes = await pool.query('SELECT * FROM follow_requests WHERE id = $1 AND target_id = $2', [req.params.id, req.user.id]);
+  const request = requestRes.rows[0];
   if (!request) return res.status(404).json({ message: 'Request not found' });
 
-  db.prepare('DELETE FROM follow_requests WHERE id = ?').run(request.id);
+  await pool.query('DELETE FROM follow_requests WHERE id = $1', [request.id]);
   // Delete the notification
-  db.prepare(`
-    DELETE FROM notifications WHERE recipient_id = ? AND actor_id = ? AND type = 'follow_request'
-  `).run(req.user.id, request.requester_id);
+  await pool.query(`
+    DELETE FROM notifications WHERE recipient_id = $1 AND actor_id = $2 AND type = 'follow_request'
+  `, [req.user.id, request.requester_id]);
 
   res.json({ success: true });
 });
@@ -211,65 +251,81 @@ router.post('/requests/:id/decline', authenticate, (req, res) => {
 // ─── Block & Mute Endpoints ──────────────────────────────────────────────────
 
 // GET /api/users/me/blocks
-router.get('/me/blocks', authenticate, (req, res) => {
-  const blocks = db.prepare(`
+router.get('/me/blocks', authenticate, async (req, res) => {
+  const result = await pool.query(`
     SELECT u.* FROM blocks b
     JOIN users u ON b.blocked_id = u.id
-    WHERE b.blocker_id = ?
+    WHERE b.blocker_id = $1
     ORDER BY b.created_at DESC
-  `).all(req.user.id);
-  res.json({ users: blocks.map(u => formatUser(u, req.user.id)) });
+  `, [req.user.id]);
+  
+  const users = await Promise.all(result.rows.map(u => formatUser(u, req.user.id)));
+  res.json({ users });
 });
 
 // POST /api/users/:username/block
-router.post('/:username/block', authenticate, (req, res) => {
-  const target = db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+router.post('/:username/block', authenticate, async (req, res) => {
+  const targetRes = await pool.query('SELECT id FROM users WHERE username = $1', [req.params.username]);
+  const target = targetRes.rows[0];
   if (!target) return res.status(404).json({ message: 'User not found' });
   if (target.id === req.user.id) return res.status(400).json({ message: 'Cannot block yourself' });
 
-  db.transaction(() => {
-    db.prepare('INSERT OR IGNORE INTO blocks (blocker_id, blocked_id) VALUES (?, ?)').run(req.user.id, target.id);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.user.id, target.id]);
     // Unfollow each other
-    db.prepare('DELETE FROM follows WHERE (follower_id = ? AND following_id = ?) OR (follower_id = ? AND following_id = ?)').run(req.user.id, target.id, target.id, req.user.id);
-  })();
-  res.json({ success: true });
+    await client.query('DELETE FROM follows WHERE (follower_id = $1 AND following_id = $2) OR (follower_id = $2 AND following_id = $1)', [req.user.id, target.id]);
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ message: err.message });
+  } finally {
+    client.release();
+  }
 });
 
 // DELETE /api/users/:username/block
-router.delete('/:username/block', authenticate, (req, res) => {
-  const target = db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+router.delete('/:username/block', authenticate, async (req, res) => {
+  const targetRes = await pool.query('SELECT id FROM users WHERE username = $1', [req.params.username]);
+  const target = targetRes.rows[0];
   if (target) {
-    db.prepare('DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?').run(req.user.id, target.id);
+    await pool.query('DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2', [req.user.id, target.id]);
   }
   res.json({ success: true });
 });
 
 // GET /api/users/me/mutes
-router.get('/me/mutes', authenticate, (req, res) => {
-  const mutes = db.prepare(`
+router.get('/me/mutes', authenticate, async (req, res) => {
+  const result = await pool.query(`
     SELECT u.* FROM mutes m
     JOIN users u ON m.muted_id = u.id
-    WHERE m.muter_id = ?
+    WHERE m.muter_id = $1
     ORDER BY m.created_at DESC
-  `).all(req.user.id);
-  res.json({ users: mutes.map(u => formatUser(u, req.user.id)) });
+  `, [req.user.id]);
+  
+  const users = await Promise.all(result.rows.map(u => formatUser(u, req.user.id)));
+  res.json({ users });
 });
 
 // POST /api/users/:username/mute
-router.post('/:username/mute', authenticate, (req, res) => {
-  const target = db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+router.post('/:username/mute', authenticate, async (req, res) => {
+  const targetRes = await pool.query('SELECT id FROM users WHERE username = $1', [req.params.username]);
+  const target = targetRes.rows[0];
   if (!target) return res.status(404).json({ message: 'User not found' });
   if (target.id === req.user.id) return res.status(400).json({ message: 'Cannot mute yourself' });
 
-  db.prepare('INSERT OR IGNORE INTO mutes (muter_id, muted_id) VALUES (?, ?)').run(req.user.id, target.id);
+  await pool.query('INSERT INTO mutes (muter_id, muted_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.user.id, target.id]);
   res.json({ success: true });
 });
 
 // DELETE /api/users/:username/mute
-router.delete('/:username/mute', authenticate, (req, res) => {
-  const target = db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+router.delete('/:username/mute', authenticate, async (req, res) => {
+  const targetRes = await pool.query('SELECT id FROM users WHERE username = $1', [req.params.username]);
+  const target = targetRes.rows[0];
   if (target) {
-    db.prepare('DELETE FROM mutes WHERE muter_id = ? AND muted_id = ?').run(req.user.id, target.id);
+    await pool.query('DELETE FROM mutes WHERE muter_id = $1 AND muted_id = $2', [req.user.id, target.id]);
   }
   res.json({ success: true });
 });
@@ -277,31 +333,35 @@ router.delete('/:username/mute', authenticate, (req, res) => {
 // ─── Close Friends Endpoints ─────────────────────────────────────────────────
 
 // GET /api/users/me/close-friends
-router.get('/me/close-friends', authenticate, (req, res) => {
-  const friends = db.prepare(`
+router.get('/me/close-friends', authenticate, async (req, res) => {
+  const result = await pool.query(`
     SELECT u.* FROM close_friends c
     JOIN users u ON c.friend_id = u.id
-    WHERE c.user_id = ?
+    WHERE c.user_id = $1
     ORDER BY c.created_at DESC
-  `).all(req.user.id);
-  res.json({ users: friends.map(u => formatUser(u, req.user.id)) });
+  `, [req.user.id]);
+  
+  const users = await Promise.all(result.rows.map(u => formatUser(u, req.user.id)));
+  res.json({ users });
 });
 
 // POST /api/users/:username/close-friend
-router.post('/:username/close-friend', authenticate, (req, res) => {
-  const target = db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+router.post('/:username/close-friend', authenticate, async (req, res) => {
+  const targetRes = await pool.query('SELECT id FROM users WHERE username = $1', [req.params.username]);
+  const target = targetRes.rows[0];
   if (!target) return res.status(404).json({ message: 'User not found' });
   if (target.id === req.user.id) return res.status(400).json({ message: 'Cannot add yourself to close friends' });
 
-  db.prepare('INSERT OR IGNORE INTO close_friends (user_id, friend_id) VALUES (?, ?)').run(req.user.id, target.id);
+  await pool.query('INSERT INTO close_friends (user_id, friend_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.user.id, target.id]);
   res.json({ success: true });
 });
 
 // DELETE /api/users/:username/close-friend
-router.delete('/:username/close-friend', authenticate, (req, res) => {
-  const target = db.prepare('SELECT id FROM users WHERE username = ?').get(req.params.username);
+router.delete('/:username/close-friend', authenticate, async (req, res) => {
+  const targetRes = await pool.query('SELECT id FROM users WHERE username = $1', [req.params.username]);
+  const target = targetRes.rows[0];
   if (target) {
-    db.prepare('DELETE FROM close_friends WHERE user_id = ? AND friend_id = ?').run(req.user.id, target.id);
+    await pool.query('DELETE FROM close_friends WHERE user_id = $1 AND friend_id = $2', [req.user.id, target.id]);
   }
   res.json({ success: true });
 });

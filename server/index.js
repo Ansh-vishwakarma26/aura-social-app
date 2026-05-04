@@ -60,7 +60,16 @@ app.use((err, req, res, _next) => {
   res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Aura API running on http://localhost:${PORT}`);
-  console.log(`💾 Mode: ${IS_PROD ? 'production' : 'development'}`);
-});
+const runMigrations = require('./migrations');
+
+async function startServer() {
+  // Run migrations before starting
+  await runMigrations();
+
+  app.listen(PORT, () => {
+    console.log(`🚀 Aura API running on http://localhost:${PORT}`);
+    console.log(`💾 Mode: ${IS_PROD ? 'production' : 'development'}`);
+  });
+}
+
+startServer();

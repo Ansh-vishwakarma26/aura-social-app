@@ -1,7 +1,5 @@
-// In dev: proxied to localhost:3001 by Vite
-// In prod (same host): '/api' works directly
-// In prod (separate hosts): set VITE_API_URL=https://your-backend.com/api
-const BASE = import.meta.env.VITE_API_URL ?? '/api';
+// Connected to local backend: http://localhost:3001/api
+const API_URL = import.meta.env.VITE_API_URL;
 
 function getToken() {
   return localStorage.getItem('aura_token');
@@ -13,7 +11,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
 
-  const res = await fetch(`${BASE}${endpoint}`, { ...options, headers });
+  const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {

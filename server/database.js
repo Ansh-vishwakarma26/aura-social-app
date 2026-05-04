@@ -1,8 +1,7 @@
-const Database = require('better-sqlite3');
+const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, 'aura.db');
 const UPLOADS_PATH = path.join(__dirname, 'uploads');
 
 // Ensure uploads directory exists
@@ -10,147 +9,153 @@ if (!fs.existsSync(UPLOADS_PATH)) {
   fs.mkdirSync(UPLOADS_PATH, { recursive: true });
 }
 
-const db = new Database(DB_PATH);
+// ─── PostgreSQL Connection ───────────────────────────────────────────────────
+// Setup connection pool. Configure DATABASE_URL in your .env file.
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/aura',
+});
 
-// Enable WAL mode for better performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+console.log('📡 Database connection string:', (process.env.DATABASE_URL || 'FALLBACK').replace(/:[^@]+@/, ':****@'));
 
-// ─── Graceful shutdown: flush WAL → main .db file ────────────────────────────
-// Without this, data written since last checkpoint is only in aura.db-wal
-// and could appear missing to external tools or after a crash.
-function checkpoint() {
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
+
+async function initDB() {
+  const client = await pool.connect();
   try {
-    db.pragma('wal_checkpoint(TRUNCATE)');
-    console.log('✅ Database checkpoint complete — all data saved to aura.db');
-  } catch (e) {
-    console.error('⚠️  Checkpoint failed:', e.message);
+    console.log('✅ Connected to PostgreSQL');
+    
+    // Create all tables
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        full_name VARCHAR(255) NOT NULL,
+        bio TEXT DEFAULT '',
+        avatar_url TEXT DEFAULT '',
+        cover_image_url TEXT DEFAULT '',
+        mbti VARCHAR(50) DEFAULT 'INFP',
+        is_private INT DEFAULT 0,
+        push_enabled INT DEFAULT 1,
+        email_enabled INT DEFAULT 1,
+        quiet_mode INT DEFAULT 0,
+        activity_status_enabled INT DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS posts (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        caption TEXT NOT NULL,
+        image_url TEXT DEFAULT '',
+        is_close_friends INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS likes (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        post_id INT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, post_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS comments (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        post_id INT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        text TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS bookmarks (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        post_id INT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, post_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS follows (
+        id SERIAL PRIMARY KEY,
+        follower_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        following_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(follower_id, following_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        recipient_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        actor_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL CHECK(type IN ('like', 'comment', 'follow', 'follow_request')),
+        post_id INT REFERENCES posts(id) ON DELETE CASCADE,
+        text TEXT DEFAULT '',
+        is_read INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS follow_requests (
+        id SERIAL PRIMARY KEY,
+        requester_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        target_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(requester_id, target_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        sender_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        text TEXT NOT NULL,
+        is_read INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS blocks (
+        id SERIAL PRIMARY KEY,
+        blocker_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        blocked_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(blocker_id, blocked_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS mutes (
+        id SERIAL PRIMARY KEY,
+        muter_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        muted_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(muter_id, muted_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS close_friends (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        friend_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, friend_id)
+      );
+    `);
+    console.log('✅ PostgreSQL schema initialized');
+  } catch (err) {
+    console.error('⚠️ Database initialization failed:', err.message);
+  } finally {
+    client.release();
   }
 }
 
-process.on('SIGINT',  () => { checkpoint(); process.exit(0); });
-process.on('SIGTERM', () => { checkpoint(); process.exit(0); });
-process.on('exit',    () => { try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch {} });
-
-// Create all tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    full_name TEXT NOT NULL,
-    bio TEXT DEFAULT '',
-    avatar_url TEXT DEFAULT '',
-    cover_image_url TEXT DEFAULT '',
-    mbti TEXT DEFAULT 'INFP',
-    is_private INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS posts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    caption TEXT NOT NULL,
-    image_url TEXT DEFAULT '',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS likes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, post_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS comments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-    text TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS bookmarks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, post_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS follows (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(follower_id, following_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS notifications (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    actor_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type TEXT NOT NULL CHECK(type IN ('like', 'comment', 'follow', 'follow_request')),
-    post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
-    text TEXT DEFAULT '',
-    is_read INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS follow_requests (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    target_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(requester_id, target_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    receiver_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    text TEXT NOT NULL,
-    is_read INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS blocks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(blocker_id, blocked_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS mutes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    muter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    muted_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(muter_id, muted_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS close_friends (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, friend_id)
-  );
-`);
-
-// ─── Migrations ──────────────────────────────────────────────────────────────
-try {
-  db.exec('ALTER TABLE posts ADD COLUMN is_close_friends INTEGER DEFAULT 0;');
-} catch (e) {
-  // column already exists
-}
+// Automatically init DB on start
+initDB();
 
 // ─── Helper: time ago ────────────────────────────────────────────────────────
 function timeAgo(dateStr) {
-  const formattedDate = dateStr.includes('Z') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+  if (!dateStr) return 'just now';
+  const dStr = typeof dateStr === 'string' ? dateStr : dateStr.toISOString();
+  const formattedDate = dStr.includes('Z') ? dStr : dStr.replace(' ', 'T') + 'Z';
   const date = new Date(formattedDate);
   const now = new Date();
   const diff = now - date;
@@ -164,12 +169,19 @@ function timeAgo(dateStr) {
 }
 
 // ─── Helper: format user row ─────────────────────────────────────────────────
-function formatUser(user, currentUserId = null) {
-  const followersCount = db.prepare('SELECT COUNT(*) as c FROM follows WHERE following_id = ?').get(user.id).c;
-  const followingCount = db.prepare('SELECT COUNT(*) as c FROM follows WHERE follower_id = ?').get(user.id).c;
-  const isFollowing = currentUserId
-    ? !!db.prepare('SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?').get(currentUserId, user.id)
-    : false;
+async function formatUser(user, currentUserId = null) {
+  const followersCount = (await pool.query('SELECT COUNT(*) as c FROM follows WHERE following_id = $1', [user.id])).rows[0].c;
+  const followingCount = (await pool.query('SELECT COUNT(*) as c FROM follows WHERE follower_id = $1', [user.id])).rows[0].c;
+  
+  let isFollowing = false;
+  let isRequested = false;
+  let isCloseFriend = false;
+  
+  if (currentUserId) {
+    isFollowing = (await pool.query('SELECT 1 FROM follows WHERE follower_id = $1 AND following_id = $2', [currentUserId, user.id])).rowCount > 0;
+    isRequested = (await pool.query('SELECT 1 FROM follow_requests WHERE requester_id = $1 AND target_id = $2', [currentUserId, user.id])).rowCount > 0;
+    isCloseFriend = (await pool.query('SELECT 1 FROM close_friends WHERE user_id = $1 AND friend_id = $2', [currentUserId, user.id])).rowCount > 0;
+  }
 
   return {
     id: String(user.id),
@@ -185,15 +197,11 @@ function formatUser(user, currentUserId = null) {
     emailEnabled: user.email_enabled === 1,
     quietMode: user.quiet_mode === 1,
     activityStatusEnabled: user.activity_status_enabled === 1,
-    isRequested: currentUserId 
-      ? !!db.prepare('SELECT 1 FROM follow_requests WHERE requester_id = ? AND target_id = ?').get(currentUserId, user.id)
-      : false,
-    followers: followersCount,
-    following: followingCount,
+    isRequested,
+    followers: parseInt(followersCount, 10),
+    following: parseInt(followingCount, 10),
     isFollowing,
-    isCloseFriend: currentUserId
-      ? !!db.prepare('SELECT 1 FROM close_friends WHERE user_id = ? AND friend_id = ?').get(currentUserId, user.id)
-      : false,
+    isCloseFriend,
     createdAt: user.created_at,
   };
 }
@@ -205,17 +213,17 @@ const POST_QUERY = `
     u.username, u.full_name, u.avatar_url, u.bio, u.mbti,
     COUNT(DISTINCT l.id) AS likes_count,
     COUNT(DISTINCT c.id) AS comments_count,
-    MAX(CASE WHEN ul.user_id = @uid THEN 1 ELSE 0 END) AS is_liked,
-    MAX(CASE WHEN b.user_id = @uid THEN 1 ELSE 0 END) AS is_saved
+    MAX(CASE WHEN ul.user_id = $1 THEN 1 ELSE 0 END) AS is_liked,
+    MAX(CASE WHEN b.user_id = $1 THEN 1 ELSE 0 END) AS is_saved
   FROM posts p
   JOIN users u ON p.user_id = u.id
   LEFT JOIN likes l ON l.post_id = p.id
   LEFT JOIN comments c ON c.post_id = p.id
-  LEFT JOIN likes ul ON ul.post_id = p.id AND ul.user_id = @uid
-  LEFT JOIN bookmarks b ON b.post_id = p.id AND b.user_id = @uid
+  LEFT JOIN likes ul ON ul.post_id = p.id AND ul.user_id = $1
+  LEFT JOIN bookmarks b ON b.post_id = p.id AND b.user_id = $1
 `;
 
-function formatPost(row, currentUserId = null) {
+async function formatPost(row, currentUserId = null) {
   return {
     id: String(row.id),
     userId: String(row.user_id),
@@ -229,8 +237,8 @@ function formatPost(row, currentUserId = null) {
     },
     image: row.image_url || '',
     caption: row.caption,
-    likes: row.likes_count || 0,
-    commentsCount: row.comments_count || 0,
+    likes: parseInt(row.likes_count, 10) || 0,
+    commentsCount: parseInt(row.comments_count, 10) || 0,
     isLiked: !!row.is_liked,
     isSaved: !!row.is_saved,
     isCloseFriends: !!row.is_close_friends,
@@ -240,19 +248,22 @@ function formatPost(row, currentUserId = null) {
 }
 
 // ─── Helper: Send Notification ───────────────────────────────────────────────
-function sendNotification(recipientId, actorId, type, postId = null, text = null) {
+async function sendNotification(recipientId, actorId, type, postId = null, text = null) {
   if (recipientId === actorId) return; // Don't notify self
 
-  const recipient = db.prepare('SELECT quiet_mode, push_enabled, email_enabled, email, username FROM users WHERE id = ?').get(recipientId);
-  const actor = db.prepare('SELECT username FROM users WHERE id = ?').get(actorId);
+  const recipientRes = await pool.query('SELECT quiet_mode, push_enabled, email_enabled, email, username FROM users WHERE id = $1', [recipientId]);
+  const actorRes = await pool.query('SELECT username FROM users WHERE id = $1', [actorId]);
   
-  if (!recipient) return;
+  if (recipientRes.rowCount === 0 || actorRes.rowCount === 0) return;
+
+  const recipient = recipientRes.rows[0];
+  const actor = actorRes.rows[0];
 
   // Insert into app notifications (Quiet Mode doesn't stop in-app notifications, just external ones)
-  db.prepare(`
+  await pool.query(`
     INSERT INTO notifications (recipient_id, actor_id, type, post_id, text)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(recipientId, actorId, type, postId, text);
+    VALUES ($1, $2, $3, $4, $5)
+  `, [recipientId, actorId, type, postId, text]);
 
   // External Notifications (Push / Email)
   if (!recipient.quiet_mode) {
@@ -271,4 +282,4 @@ function sendNotification(recipientId, actorId, type, postId = null, text = null
   }
 }
 
-module.exports = { db, formatUser, formatPost, POST_QUERY, timeAgo, sendNotification };
+module.exports = { pool, formatUser, formatPost, POST_QUERY, timeAgo, sendNotification };
