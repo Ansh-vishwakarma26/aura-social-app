@@ -5,7 +5,7 @@ import { useTheme } from "next-themes";
 import { api } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { Avatar } from "../components/ui/Avatar";
-import { Button } from "../components/ui/Button2";
+import { Button } from "../components/ui/Button";
 import { cn } from "../lib/utils";
 
 const MBTI_TYPES = ["INTJ","INTP","ENTJ","ENTP","INFJ","INFP","ENFJ","ENFP","ISTJ","ISFJ","ESTJ","ESFJ","ISTP","ISFP","ESTP","ESFP"];
