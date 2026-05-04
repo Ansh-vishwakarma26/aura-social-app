@@ -69,6 +69,7 @@ async function startServer() {
   app.listen(PORT, () => {
     console.log(`🚀 Aura API running on http://localhost:${PORT}`);
     console.log(`💾 Mode: ${IS_PROD ? 'production' : 'development'}`);
+    console.log(`🗄️  Database: PostgreSQL`);
   });
 }
 
