@@ -39,6 +39,7 @@ app.use('/api/posts',         require('./routes/posts'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/explore',       require('./routes/explore'));
 app.use('/api/messages',      require('./routes/messages'));
+app.use('/api/upload',        require('./routes/upload'));
 
 // Bookmarks shortcut (/api/bookmarks → explore router)
 app.use('/api', require('./routes/explore'));

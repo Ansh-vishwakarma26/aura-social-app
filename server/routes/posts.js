@@ -4,12 +4,24 @@ const multer = require('multer');
 const { pool, formatPost, formatUser, POST_QUERY, timeAgo, sendNotification } = require('../database');
 const { authenticate, optionalAuth } = require('../middleware/auth');
 
+const cloudinary = require('../cloudinary');
+
 // ─── Multer for post images ──────────────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination: path.join(__dirname, '../../server/uploads'),
-  filename: (req, file, cb) => cb(null, `post-${Date.now()}${path.extname(file.originalname)}`),
-});
+const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+
+const uploadToCloudinary = (file, folder) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result.secure_url);
+      }
+    );
+    stream.end(file.buffer);
+  });
+};
 
 // ─── GET /api/posts/feed ─────────────────────────────────────────────────────
 router.get('/feed', authenticate, async (req, res) => {
@@ -107,7 +119,14 @@ router.get('/:id', optionalAuth, async (req, res) => {
 router.post('/', authenticate, upload.single('image'), async (req, res) => {
   const { caption, isCloseFriends } = req.body;
   if (!caption) return res.status(400).json({ message: 'Caption is required' });
-  const imageUrl = req.file ? `/uploads/${req.file.filename}` : (req.body.imageUrl || '');
+  let imageUrl = req.body.imageUrl || '';
+  if (req.file) {
+    try {
+      imageUrl = await uploadToCloudinary(req.file, 'aura_posts');
+    } catch (err) {
+      console.error('Cloudinary post upload error:', err);
+    }
+  }
   const closeFriendsFlag = isCloseFriends === 'true' || isCloseFriends === true ? 1 : 0;
   
   const insertResult = await pool.query('INSERT INTO posts (user_id, caption, image_url, is_close_friends) VALUES ($1, $2, $3, $4) RETURNING id', [req.user.id, caption, imageUrl, closeFriendsFlag]);

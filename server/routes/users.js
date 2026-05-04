@@ -5,11 +5,23 @@ const { pool, formatUser, sendNotification } = require('../database');
 const { authenticate, optionalAuth } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 
-const storage = multer.diskStorage({
-  destination: path.join(__dirname, '../../server/uploads'),
-  filename: (req, file, cb) => cb(null, `avatar-${Date.now()}${path.extname(file.originalname)}`),
-});
+const cloudinary = require('../cloudinary');
+
+const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+
+const uploadToCloudinary = (file, folder) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result.secure_url);
+      }
+    );
+    stream.end(file.buffer);
+  });
+};
 
 // GET /api/users/search?q=
 router.get('/search', optionalAuth, async (req, res) => {
@@ -49,8 +61,24 @@ router.put('/me', authenticate, upload.fields([{ name: 'avatar', maxCount: 1 }, 
   const avatarFile = req.files?.['avatar']?.[0];
   const coverFile = req.files?.['cover']?.[0];
 
-  const avatarUrl = avatarFile ? `/uploads/${avatarFile.filename}` : undefined;
-  const coverUrl = coverFile ? `/uploads/${coverFile.filename}` : coverImage;
+  let avatarUrl = undefined;
+  let coverUrl = coverImage;
+
+  if (avatarFile) {
+    try {
+      avatarUrl = await uploadToCloudinary(avatarFile, 'aura_avatars');
+    } catch (err) {
+      console.error('Cloudinary avatar upload error:', err);
+    }
+  }
+
+  if (coverFile) {
+    try {
+      coverUrl = await uploadToCloudinary(coverFile, 'aura_covers');
+    } catch (err) {
+      console.error('Cloudinary cover upload error:', err);
+    }
+  }
 
   const current = req.user;
 

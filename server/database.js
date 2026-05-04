@@ -3,6 +3,13 @@ const path = require('path');
 const fs = require('fs');
 
 const UPLOADS_PATH = path.join(__dirname, 'uploads');
+const APP_URL = process.env.APP_URL || 'http://localhost:3001';
+
+const resolveUrl = (url) => {
+  if (!url) return url;
+  if (url.startsWith('http')) return url;
+  return `${APP_URL}${url}`;
+};
 
 // Ensure uploads directory exists
 if (!fs.existsSync(UPLOADS_PATH)) {
@@ -190,8 +197,8 @@ async function formatUser(user, currentUserId = null) {
     fullName: user.full_name,
     email: user.email,
     bio: user.bio || '',
-    avatar: user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name)}&background=18181b&color=ffffff`,
-    coverImage: user.cover_image_url || '',
+    avatar: resolveUrl(user.avatar_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name)}&background=18181b&color=ffffff`,
+    coverImage: resolveUrl(user.cover_image_url) || '',
     mbti: user.mbti || 'INFP',
     isPrivate: !!user.is_private,
     pushEnabled: user.push_enabled === 1,
@@ -232,11 +239,11 @@ async function formatPost(row, currentUserId = null) {
       id: String(row.user_id),
       username: row.username,
       fullName: row.full_name,
-      avatar: row.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(row.full_name)}&background=18181b&color=ffffff`,
+      avatar: resolveUrl(row.avatar_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(row.full_name)}&background=18181b&color=ffffff`,
       mbti: row.mbti || 'INFP',
       bio: row.bio || '',
     },
-    image: row.image_url || '',
+    image: resolveUrl(row.image_url) || '',
     caption: row.caption,
     likes: parseInt(row.likes_count, 10) || 0,
     commentsCount: parseInt(row.comments_count, 10) || 0,
