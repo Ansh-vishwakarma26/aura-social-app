@@ -60,10 +60,12 @@ app.use((err, req, res, _next) => {
   res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
 });
 
+const { initDB } = require('./database');
 const runMigrations = require('./migrations');
 
 async function startServer() {
-  // Run migrations before starting
+  // Initialize base schema and then run migrations
+  await initDB();
   await runMigrations();
 
   app.listen(PORT, () => {

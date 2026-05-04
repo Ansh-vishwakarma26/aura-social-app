@@ -148,8 +148,8 @@ async function initDB() {
   }
 }
 
-// Automatically init DB on start
-initDB();
+// Removed auto-init to prevent race conditions with migrations
+// initDB();
 
 // ─── Helper: time ago ────────────────────────────────────────────────────────
 function timeAgo(dateStr) {
@@ -282,4 +282,4 @@ async function sendNotification(recipientId, actorId, type, postId = null, text 
   }
 }
 
-module.exports = { pool, formatUser, formatPost, POST_QUERY, timeAgo, sendNotification };
+module.exports = { pool, initDB, formatUser, formatPost, POST_QUERY, timeAgo, sendNotification };
