@@ -42,13 +42,13 @@ export const CreatePost = () => {
     setError(""); setSubmitting(true);
     try {
       console.log("🚀 Creating new post...");
-      const form = new FormData();
-      form.append("caption", caption.trim());
-      form.append("isCloseFriends", String(isCloseFriends));
-      if (imageUrl) form.append("imageUrl", imageUrl);
       
       console.log("📤 Sending post request to /api/posts...");
-      await api.post("/posts", form);
+      await api.post("/posts", {
+        caption: caption.trim(),
+        isCloseFriends,
+        imageUrl
+      });
       console.log("✅ Post created!");
       navigate("/");
     } catch (e: any) {

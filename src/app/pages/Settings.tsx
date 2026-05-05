@@ -111,24 +111,21 @@ export const Settings = () => {
   const handleSave = async () => {
     console.log("💾 Save button clicked");
     setSaving(true); setSaveMsg(null);
-    try {
-      console.log("📦 Preparing form data...");
-      const form = new FormData();
-      form.append('fullName', fullName);
-      form.append('username', username);
-      form.append('bio', bio);
-      form.append('mbti', selectedMBTI);
-      form.append('isPrivate', String(isPrivate));
-      form.append('pushEnabled', String(pushEnabled));
-      form.append('emailEnabled', String(emailEnabled));
-      form.append('quietMode', String(quietMode));
-      form.append('activityStatusEnabled', String(activityStatusEnabled));
-      if (avatarUrl) form.append('avatarUrl', avatarUrl);
-      if (coverUrl) form.append('coverUrl', coverUrl);
-      else if (!coverFile) form.append('coverImage', coverColor);
-      
       console.log("🚀 Sending update request to /users/me...");
-      const data = await api.put<{ user: any }>('/users/me', form);
+      const data = await api.put<{ user: any }>('/users/me', {
+        fullName,
+        username,
+        bio,
+        mbti: selectedMBTI,
+        isPrivate,
+        pushEnabled,
+        emailEnabled,
+        quietMode,
+        activityStatusEnabled,
+        avatarUrl,
+        coverUrl,
+        coverImage: !coverUrl ? coverColor : undefined
+      });
       console.log("✅ Update successful:", data);
       updateUser(data.user);
       setSaveMsg({ type: 'success', text: 'Profile updated successfully!' });
