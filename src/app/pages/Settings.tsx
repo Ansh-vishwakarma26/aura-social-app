@@ -111,6 +111,7 @@ export const Settings = () => {
   const handleSave = async () => {
     console.log("💾 Save button clicked");
     setSaving(true); setSaveMsg(null);
+    try {
       console.log("🚀 Sending update request to /users/me...");
       const data = await api.put<{ user: any }>('/users/me', {
         fullName,
