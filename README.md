@@ -1,11 +1,19 @@
+# Aura - Full-Stack Social Media Application
 
-  # Aura
+🌐 **Live Demo:** [aura-social-app.netlify.app](https://aura-social-app.netlify.app)
+🎨 **UI Design:** Created using Figma
 
-  This is a code bundle for Aura. The original project is available at https://www.figma.com/design/t6LFByc1ZazVbiyiRqJblo/CampusConnect-Social-Media-UI.
+## Overview
+Aura is a modern, responsive full-stack social media platform. It features secure profile management, real-time media uploads, and a highly polished user interface translated directly from Figma designs. 
 
-  ## Running the code
+## Tech Stack
+- **Frontend:** React, Vite (Deployed via Netlify)
+- **Backend:** Django, Django REST Framework
+- **Database:** PostgreSQL
+- **Media Storage:** Cloudinary 
 
-  Run `npm i` to install the dependencies.
-
-  Run `npm run dev` to start the development server.
-  
+## Key Features
+- Dynamic media uploading for user avatars and posts using Cloudinary and Django models.
+- Fully editable user profiles (Bio, MBTI personality types, etc.) with secure token-based authentication.
+- RESTful API architecture ensuring smooth client-server communication.
+- Clean, component-based frontend designed for scalability.
