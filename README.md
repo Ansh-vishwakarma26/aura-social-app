@@ -8,12 +8,12 @@ Aura is a modern, responsive full-stack social media platform. It features secur
 
 ## Tech Stack
 - **Frontend:** React, Vite (Deployed via Netlify)
-- **Backend:** Django, Django REST Framework
-- **Database:** PostgreSQL
+- **Backend:** Django, Django REST Framework (Deployed via Render)
+- **Database:** PostgreSQL (Hosted on Render)
 - **Media Storage:** Cloudinary 
 
 ## Key Features
-- Dynamic media uploading for user avatars and posts using Cloudinary and Django models.
-- Fully editable user profiles (Bio, MBTI personality types, etc.) with secure token-based authentication.
-- RESTful API architecture ensuring smooth client-server communication.
-- Clean, component-based frontend designed for scalability.
+- **Seamless Media Management:** Dynamic media uploading for user avatars and posts, utilizing Cloudinary for fast, secure cloud storage integrated with Django models.
+- **Secure Authentication:** Fully editable user profiles (Bio, MBTI personality types, etc.) protected by secure, token-based authentication.
+- **Robust Architecture:** RESTful API architecture ensuring smooth, reliable client-server communication between Netlify and Render.
+- **Modern UI/UX:** Clean, component-based React frontend designed for scalability and a premium user experience.
