@@ -12,16 +12,29 @@ export const CreatePost = () => {
   const [caption, setCaption] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isCloseFriends, setIsCloseFriends] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setFile(f);
     setPreview(URL.createObjectURL(f));
+    
+    // Immediate upload
+    try {
+      console.log("☁️ Uploading post image...");
+      const formData = new FormData();
+      formData.append("image", f);
+      const data = await api.upload<{ url: string }>("/upload", formData);
+      setImageUrl(data.url);
+      console.log("✅ Image uploaded:", data.url);
+    } catch (err) {
+      console.error("❌ Image upload failed:", err);
+    }
   };
 
   const handleSubmit = async () => {
@@ -32,13 +45,10 @@ export const CreatePost = () => {
       const form = new FormData();
       form.append("caption", caption.trim());
       form.append("isCloseFriends", String(isCloseFriends));
-      if (file) {
-        console.log("📎 Appending image file...");
-        form.append("image", file);
-      }
+      if (imageUrl) form.append("imageUrl", imageUrl);
       
       console.log("📤 Sending post request to /api/posts...");
-      await api.upload("/posts", form);
+      await api.post("/posts", form);
       console.log("✅ Post created!");
       navigate("/");
     } catch (e: any) {

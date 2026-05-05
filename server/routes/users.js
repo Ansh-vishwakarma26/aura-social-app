@@ -61,8 +61,8 @@ router.put('/me', authenticate, upload.fields([{ name: 'avatar', maxCount: 1 }, 
   const avatarFile = req.files?.['avatar']?.[0];
   const coverFile = req.files?.['cover']?.[0];
 
-  let avatarUrl = undefined;
-  let coverUrl = coverImage;
+  let avatarUrl = req.body.avatarUrl;
+  let coverUrl = req.body.coverUrl || coverImage;
 
   if (avatarFile) {
     try {

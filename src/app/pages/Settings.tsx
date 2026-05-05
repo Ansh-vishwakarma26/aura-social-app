@@ -30,6 +30,8 @@ export const Settings = () => {
   const [coverPreview, setCoverPreview] = useState<string | null>(user?.coverImage && !user.coverImage.startsWith('#') ? user.coverImage : null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
@@ -68,18 +70,42 @@ export const Settings = () => {
   const fileRef = React.useRef<HTMLInputElement>(null);
   const coverFileRef = React.useRef<HTMLInputElement>(null);
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setAvatarFile(f);
     setAvatarPreview(URL.createObjectURL(f));
+    
+    // Immediate upload
+    try {
+      console.log("☁️ Uploading avatar...");
+      const formData = new FormData();
+      formData.append("avatar", f);
+      const data = await api.upload<{ url: string }>("/upload", formData);
+      setAvatarUrl(data.url);
+      console.log("✅ Avatar uploaded:", data.url);
+    } catch (err) {
+      console.error("❌ Avatar upload failed:", err);
+    }
   };
 
-  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setCoverFile(f);
     setCoverPreview(URL.createObjectURL(f));
+
+    // Immediate upload
+    try {
+      console.log("☁️ Uploading cover...");
+      const formData = new FormData();
+      formData.append("cover", f);
+      const data = await api.upload<{ url: string }>("/upload", formData);
+      setCoverUrl(data.url);
+      console.log("✅ Cover uploaded:", data.url);
+    } catch (err) {
+      console.error("❌ Cover upload failed:", err);
+    }
   };
 
   const handleSave = async () => {
@@ -97,15 +123,12 @@ export const Settings = () => {
       form.append('emailEnabled', String(emailEnabled));
       form.append('quietMode', String(quietMode));
       form.append('activityStatusEnabled', String(activityStatusEnabled));
-      if (coverFile) {
-        form.append('cover', coverFile);
-      } else {
-        form.append('coverImage', coverColor);
-      }
-      if (avatarFile) form.append('avatar', avatarFile);
+      if (avatarUrl) form.append('avatarUrl', avatarUrl);
+      if (coverUrl) form.append('coverUrl', coverUrl);
+      else if (!coverFile) form.append('coverImage', coverColor);
       
       console.log("🚀 Sending update request to /users/me...");
-      const data = await api.uploadPut<{ user: any }>('/users/me', form);
+      const data = await api.put<{ user: any }>('/users/me', form);
       console.log("✅ Update successful:", data);
       updateUser(data.user);
       setSaveMsg({ type: 'success', text: 'Profile updated successfully!' });

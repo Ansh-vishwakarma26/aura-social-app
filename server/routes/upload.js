@@ -8,10 +8,12 @@ const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-router.post('/', upload.single('image'), async (req, res) => {
+router.post('/', upload.any(), async (req, res) => {
   try {
-    const file = req.file;
+    const file = req.files?.[0];
     if (!file) return res.status(400).json({ message: 'No file uploaded' });
+
+    console.log(`☁️ Uploading ${file.fieldname} to Cloudinary...`);
 
     const stream = cloudinary.uploader.upload_stream(
       { folder: "aura_uploads" },
