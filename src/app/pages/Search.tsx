@@ -13,14 +13,19 @@ export const SearchPage = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const data = await api.get<{ users: any[] }>(`/users/search?q=${encodeURIComponent(query)}`);
+        const data = await api.get<{ users: any[] }>(`/users/search?q=${encodeURIComponent(query.trim())}`);
         setResults(data.users);
       } catch { setResults([]); }
       finally { setLoading(false); }
-    }, 300);
+    }, 350);
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -36,7 +41,7 @@ export const SearchPage = () => {
   };
 
   return (
-    <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl min-h-screen md:min-h-0 md:rounded-2xl md:border border-zinc-200 dark:border-white/10 p-4 transition-colors duration-300">
+    <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl min-h-dvh md:min-h-0 md:rounded-2xl md:border border-zinc-200 dark:border-white/10 p-4 transition-colors duration-300">
       <div className="relative mb-6">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
           <SearchIcon className="h-5 w-5 text-zinc-500" />
@@ -50,7 +55,11 @@ export const SearchPage = () => {
           autoFocus
         />
         {query && (
-          <button className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300" onClick={() => setQuery("")}>
+          <button
+            className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 min-w-[44px] min-h-[44px] justify-center"
+            onClick={() => setQuery("")}
+            aria-label="Clear search"
+          >
             <X className="h-5 w-5" />
           </button>
         )}
@@ -76,7 +85,7 @@ export const SearchPage = () => {
           results.map(u => (
             <div key={u.id} className="flex items-center justify-between p-2 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-colors">
               <Link to={`/profile/${u.username}`} className="flex items-center gap-3">
-                <Avatar src={u.avatar} size="md" />
+                <Avatar src={u.avatar || u.avatar_url} size="md" />
                 <div>
                   <div className="font-semibold text-zinc-900 dark:text-white">{u.username}</div>
                   <div className="text-sm text-zinc-500 dark:text-zinc-400">{u.fullName}</div>

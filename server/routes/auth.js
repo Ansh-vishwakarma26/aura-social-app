@@ -45,14 +45,19 @@ router.post('/login', async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ message: 'Email and password are required' });
   }
-  const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-  const user = result.rows[0];
-  
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-    return res.status(401).json({ message: 'Invalid email or password' });
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
+    
+    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+    const token = signToken(user.id);
+    res.json({ token, user: await formatUser(user) });
+  } catch (err) {
+    console.error('❌ Login error:', err);
+    res.status(500).json({ message: 'Login failed. Please try again.' });
   }
-  const token = signToken(user.id);
-  res.json({ token, user: await formatUser(user) });
 });
 
 // GET /api/auth/me

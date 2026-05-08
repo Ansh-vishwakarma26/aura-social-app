@@ -191,14 +191,19 @@ async function formatUser(user, currentUserId = null) {
     isCloseFriend = (await pool.query('SELECT 1 FROM close_friends WHERE user_id = $1 AND friend_id = $2', [currentUserId, user.id])).rowCount > 0;
   }
 
+  const avatar = resolveUrl(user.avatar_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name)}&background=18181b&color=ffffff`;
+  const coverImage = resolveUrl(user.cover_image_url) || '';
+
   return {
     id: String(user.id),
     username: user.username,
     fullName: user.full_name,
     email: user.email,
     bio: user.bio || '',
-    avatar: resolveUrl(user.avatar_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name)}&background=18181b&color=ffffff`,
-    coverImage: resolveUrl(user.cover_image_url) || '',
+    avatar,
+    avatar_url: avatar, // For compatibility
+    coverImage,
+    cover_image_url: coverImage, // For compatibility
     mbti: user.mbti || 'INFP',
     isPrivate: !!user.is_private,
     pushEnabled: user.push_enabled === 1,
@@ -240,6 +245,7 @@ async function formatPost(row, currentUserId = null) {
       username: row.username,
       fullName: row.full_name,
       avatar: resolveUrl(row.avatar_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(row.full_name)}&background=18181b&color=ffffff`,
+      avatar_url: resolveUrl(row.avatar_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(row.full_name)}&background=18181b&color=ffffff`,
       mbti: row.mbti || 'INFP',
       bio: row.bio || '',
     },
@@ -290,4 +296,4 @@ async function sendNotification(recipientId, actorId, type, postId = null, text 
   }
 }
 
-module.exports = { pool, initDB, formatUser, formatPost, POST_QUERY, timeAgo, sendNotification };
+module.exports = { pool, initDB, formatUser, formatPost, POST_QUERY, timeAgo, sendNotification, resolveUrl };

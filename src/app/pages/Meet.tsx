@@ -95,23 +95,23 @@ export const Meet = () => {
   return (
     <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl md:border md:border-zinc-200 dark:border-white/10 md:rounded-3xl overflow-hidden pb-8 transition-colors duration-300">
       {/* Header */}
-      <div className="px-6 py-6 border-b border-zinc-200 dark:border-white/10">
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">Meet Your Match</h1>
-        <p className="text-zinc-500 dark:text-zinc-400">Find people compatible with your MBTI type · <span className="font-semibold text-emerald-400">{currentUser?.mbti}</span></p>
+      <div className="px-4 md:px-6 py-5 border-b border-zinc-200 dark:border-white/10">
+        <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-white mb-1">Meet Your Match</h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">Compatible with your MBTI · <span className="font-semibold text-emerald-400">{currentUser?.mbti}</span></p>
       </div>
 
       {/* Card */}
-      <div className="px-6 py-8">
+      <div className="px-4 md:px-6 py-5 md:py-8">
         {current && (
           <div className="bg-white dark:bg-gradient-to-br dark:from-zinc-800 dark:to-zinc-700 rounded-3xl overflow-hidden shadow-xl dark:shadow-2xl border border-zinc-200 dark:border-white/5">
             {/* Photo */}
-            <div className="relative h-96 bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
-              <img src={current.avatar} alt={current.fullName} className="w-full h-full object-cover" />
+            <div className="relative w-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden" style={{ height: 'min(384px, 65vw)' }}>
+              <img src={current.avatar || current.avatar_url} alt={current.fullName} className="w-full h-full object-cover" loading="lazy" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 dark:from-zinc-950 via-transparent to-transparent" />
               {/* Overlay info */}
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <h2 className="text-3xl font-bold text-white mb-1">{current.fullName}</h2>
-                <p className="text-white/80 mb-3">@{current.username}</p>
+              <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
+                <h2 className="text-2xl md:text-3xl font-bold text-white mb-1 truncate">{current.fullName}</h2>
+                <p className="text-white/80 mb-3 text-sm md:text-base truncate">@{current.username}</p>
                 <div className="flex items-center gap-3">
                   <span className="px-3 py-1 bg-emerald-500/30 border border-emerald-500/50 rounded-full text-sm font-bold text-emerald-400">{current.mbti}</span>
                   <span className="px-3 py-1 bg-white/20 border border-white/20 rounded-full text-sm text-white">{current.followers?.toLocaleString()} followers</span>
@@ -130,17 +130,17 @@ export const Meet = () => {
               <span className="text-emerald-400 font-semibold text-sm">MBTI Compatible Match!</span>
             </div>
 
-            {/* Actions */}
-            <div className="p-6 flex gap-4 border-t border-zinc-200 dark:border-white/10">
+            {/* Actions — larger touch targets on mobile */}
+            <div className="p-4 md:p-6 flex gap-3 border-t border-zinc-200 dark:border-white/10">
               <Button
                 variant="secondary"
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-zinc-100 dark:bg-white/10 border-zinc-200 dark:border-white/20 hover:bg-zinc-200 dark:hover:bg-white/20 text-zinc-900 dark:text-white"
+                className="flex-1 flex items-center justify-center gap-2 py-4 md:py-3 bg-zinc-100 dark:bg-white/10 border-zinc-200 dark:border-white/20 hover:bg-zinc-200 dark:hover:bg-white/20 active:bg-zinc-200 text-zinc-900 dark:text-white text-base font-semibold"
                 onClick={handlePass}
               >
                 <X className="w-5 h-5" /> Pass
               </Button>
               <Button
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-0"
+                className="flex-1 flex items-center justify-center gap-2 py-4 md:py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:from-emerald-800 text-white border-0 text-base font-semibold"
                 onClick={handleLike}
               >
                 <Heart className="w-5 h-5" /> Like & Follow
@@ -195,7 +195,7 @@ export const Meet = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {allUsers.filter(u => liked.has(u.id)).map(u => (
                 <Link key={u.id} to={`/profile/${u.username}`} className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-2xl overflow-hidden hover:bg-zinc-50 dark:hover:bg-white/10 transition-colors shadow-sm">
-                  <img src={u.avatar} alt={u.fullName} className="w-full h-32 object-cover" />
+                  <img src={u.avatar || u.avatar_url} alt={u.fullName} className="w-full h-32 object-cover" loading="lazy" />
                   <div className="p-3">
                     <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{u.fullName}</p>
                     <p className="text-xs text-zinc-500 mb-1">@{u.username}</p>

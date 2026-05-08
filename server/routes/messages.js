@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { pool, formatUser } = require('../database');
+const { pool, formatUser, resolveUrl } = require('../database');
 const { authenticate } = require('../middleware/auth');
 
 // ─── Helper to format a message ──────────────────────────────────────────────
@@ -50,7 +50,8 @@ router.get('/', authenticate, async (req, res) => {
         id: String(r.other_user_id),
         username: r.username,
         fullName: r.full_name,
-        avatar: r.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.full_name)}&background=18181b&color=ffffff`,
+        avatar: resolveUrl(r.avatar_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.full_name)}&background=18181b&color=ffffff`,
+        avatar_url: resolveUrl(r.avatar_url) || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.full_name)}&background=18181b&color=ffffff`,
       },
       latestMessage: msg,
       unreadCount: msg.receiverId === String(uid) && !msg.isRead ? 1 : 0 // Simplified unread

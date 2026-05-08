@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const path = require('path');
 const multer = require('multer');
-const { pool, formatPost, formatUser, POST_QUERY, timeAgo, sendNotification } = require('../database');
+const { pool, formatPost, formatUser, POST_QUERY, timeAgo, sendNotification, resolveUrl } = require('../database');
 const { authenticate, optionalAuth } = require('../middleware/auth');
 
 const cloudinary = require('../cloudinary');
@@ -106,7 +106,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
   
   post.comments = commentsRes.rows.map(c => ({
     id: String(c.id),
-    user: { id: String(c.user_id), username: c.username, fullName: c.full_name, avatar: c.avatar_url },
+    user: { id: String(c.user_id), username: c.username, fullName: c.full_name, avatar: resolveUrl(c.avatar_url), avatar_url: resolveUrl(c.avatar_url) },
     text: c.text,
     timestamp: timeAgo(c.created_at),
   }));
@@ -184,7 +184,7 @@ router.get('/:id/comments', optionalAuth, async (req, res) => {
   res.json({
     comments: result.rows.map(c => ({
       id: String(c.id),
-      user: { id: String(c.user_id), username: c.username, fullName: c.full_name, avatar: c.avatar_url },
+      user: { id: String(c.user_id), username: c.username, fullName: c.full_name, avatar: resolveUrl(c.avatar_url), avatar_url: resolveUrl(c.avatar_url) },
       text: c.text,
       timestamp: timeAgo(c.created_at),
     }))
@@ -211,7 +211,7 @@ router.post('/:id/comments', authenticate, async (req, res) => {
   res.status(201).json({
     comment: {
       id: String(comment.id),
-      user: { id: String(u.id), username: u.username, fullName: u.full_name, avatar: u.avatar_url },
+      user: { id: String(u.id), username: u.username, fullName: u.full_name, avatar: resolveUrl(u.avatar_url), avatar_url: resolveUrl(u.avatar_url) },
       text: comment.text,
       timestamp: 'just now',
     }

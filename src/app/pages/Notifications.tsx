@@ -35,7 +35,7 @@ export const Notifications = () => {
   };
 
   return (
-    <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl min-h-screen md:min-h-0 md:rounded-2xl md:border border-zinc-200 dark:border-white/10 pb-8 transition-colors duration-300">
+    <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl min-h-dvh md:min-h-0 md:rounded-2xl md:border border-zinc-200 dark:border-white/10 pb-8 transition-colors duration-300">
       <div className="sticky top-0 z-10 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200 dark:border-white/10 px-4 h-14 flex items-center">
         <h1 className="font-bold text-xl text-zinc-900 dark:text-white">Notifications</h1>
       </div>
@@ -62,9 +62,9 @@ export const Notifications = () => {
               </div>
               <div className="divide-y divide-zinc-100 dark:divide-white/5">
                 {requests.map(req => (
-                  <div key={req.requestId} className="p-4 flex items-center gap-4">
-                    <button onClick={() => navigate(`/profile/${req.username}`)}>
-                      <Avatar src={req.avatar} />
+                  <div key={req.requestId} className="p-4 flex items-center gap-3">
+                    <button onClick={() => navigate(`/profile/${req.username}`)} className="shrink-0">
+                      <Avatar src={req.avatar || req.avatar_url} />
                     </button>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">
@@ -72,16 +72,18 @@ export const Notifications = () => {
                       </p>
                       <p className="text-xs text-zinc-500">wants to follow you</p>
                     </div>
-                    <div className="flex gap-2">
-                      <button 
+                    <div className="flex gap-2 shrink-0">
+                      <button
                         onClick={() => handleRequest(req.requestId, 'accept')}
-                        className="p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 shadow-sm"
+                        className="p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 shadow-sm min-w-[36px] min-h-[36px] flex items-center justify-center"
+                        aria-label="Accept"
                       >
                         <Check className="w-4 h-4" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleRequest(req.requestId, 'decline')}
-                        className="p-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full hover:bg-zinc-300 dark:hover:bg-zinc-700"
+                        className="p-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full hover:bg-zinc-300 dark:hover:bg-zinc-700 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                        aria-label="Decline"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -92,20 +94,24 @@ export const Notifications = () => {
             </div>
           )}
 
+          {/* Notifications List */}
           {notifications.length > 0 ? notifications.map(n => (
-            <div key={n.id} className={cn("p-4 flex gap-4 transition-colors hover:bg-zinc-50 dark:hover:bg-white/5", !n.isRead && "bg-blue-50/50 dark:bg-white/[0.03]")}>
+            <div key={n.id} className={cn("px-4 py-3 flex gap-3 transition-colors hover:bg-zinc-50 dark:hover:bg-white/5", !n.isRead && "bg-blue-50/50 dark:bg-white/[0.03]")}>
+              {/* Avatar with type badge */}
               <div className="relative shrink-0">
                 <Link to={`/profile/${n.user.username}`}>
-                  <Avatar src={n.user.avatar} alt={n.user.username} />
+                  <Avatar src={n.user.avatar || n.user.avatar_url} alt={n.user.username} />
                 </Link>
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white dark:border-zinc-900 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 shadow-sm">
-                  {n.type === "like" && <Heart className="w-3.5 h-3.5 fill-red-500 text-red-500" />}
-                  {n.type === "comment" && <MessageCircle className="w-3.5 h-3.5 fill-blue-400 text-blue-400" />}
-                  {(n.type === "follow" || n.type === "follow_request") && <UserPlus className="w-3.5 h-3.5 text-zinc-400" />}
+                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white dark:border-zinc-900 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 shadow-sm">
+                  {n.type === "like" && <Heart className="w-3 h-3 fill-red-500 text-red-500" />}
+                  {n.type === "comment" && <MessageCircle className="w-3 h-3 fill-blue-400 text-blue-400" />}
+                  {(n.type === "follow" || n.type === "follow_request") && <UserPlus className="w-3 h-3 text-zinc-400" />}
                 </div>
               </div>
-              <div className="flex-1 min-w-0 flex items-center">
-                <div className="text-[15px] leading-snug text-zinc-700 dark:text-zinc-300">
+
+              {/* Text content */}
+              <div className="flex-1 min-w-0 flex items-center gap-2">
+                <div className="text-[14px] leading-snug text-zinc-700 dark:text-zinc-300 flex-1 min-w-0">
                   <Link to={`/profile/${n.user.username}`} className="font-semibold text-zinc-900 dark:text-white hover:underline mr-1">
                     {n.user.username}
                   </Link>
@@ -113,14 +119,21 @@ export const Notifications = () => {
                   {n.type === "comment" && <span>commented: <span className="text-zinc-500">"{n.text}"</span></span>}
                   {n.type === "follow" && "started following you."}
                   {n.type === "follow_request" && "requested to follow you."}
-                  <div className="text-sm text-zinc-500 mt-0.5">{n.timestamp}</div>
+                  <div className="text-xs text-zinc-500 mt-0.5">{n.timestamp}</div>
                 </div>
+
+                {/* Post thumbnail */}
+                {n.post && (
+                  <Link to={`/post/${n.post.id}`} className="shrink-0">
+                    <img
+                      src={n.post.image}
+                      className="w-10 h-10 md:w-12 md:h-12 object-cover rounded-lg border border-zinc-200 dark:border-white/10"
+                      alt="Post"
+                      loading="lazy"
+                    />
+                  </Link>
+                )}
               </div>
-              {n.post && (
-                <Link to={`/post/${n.post.id}`} className="shrink-0 ml-2">
-                  <img src={n.post.image} className="w-12 h-12 object-cover rounded-md border border-zinc-200 dark:border-white/10" alt="Post thumbnail" />
-                </Link>
-              )}
             </div>
           )) : (
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center text-zinc-500">

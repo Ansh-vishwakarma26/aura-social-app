@@ -8,8 +8,11 @@ export interface AppUser {
   email: string;
   bio: string;
   avatar: string;
+  avatar_url: string;   // alias — both returned by the API
   coverImage: string;
+  cover_image_url: string; // alias
   mbti: string;
+  isPrivate?: boolean;
   followers: number;
   following: number;
   isFollowing: boolean;

@@ -30,14 +30,25 @@ export const Home = () => {
 
   return (
     <div className="w-full pb-8">
-      {/* Quick Post Creator */}
+      {/* Quick Post Creator — desktop floating card, mobile tap-to-create */}
       <div className="hidden md:flex bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl border border-zinc-200 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-3xl p-4 mb-6 items-center gap-4 transition-colors duration-300">
-        {user && <Avatar src={user.avatar} alt={user.username} />}
+        {user && <Avatar src={user.avatar || user.avatar_url} alt={user.username} />}
         <Link to="/create" className="flex-1 bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/20 backdrop-blur-md shadow-inner transition-colors rounded-full px-4 py-2.5 text-zinc-500 dark:text-zinc-300 text-sm text-left border border-zinc-200 dark:border-white/10">
           What's on your mind?
         </Link>
-        <Link to="/create" className="p-2 text-zinc-500 dark:text-zinc-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors">
+        <Link to="/create" className="p-2 text-zinc-500 dark:text-zinc-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
           <Image className="w-6 h-6" />
+        </Link>
+      </div>
+
+      {/* Mobile Post Creator — compact version */}
+      <div className="md:hidden flex bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl border-b border-zinc-200 dark:border-white/10 px-4 py-3 items-center gap-3 transition-colors duration-300 mb-0.5">
+        {user && <Avatar src={user.avatar || user.avatar_url} alt={user.username} className="w-8 h-8 shrink-0" />}
+        <Link
+          to="/create"
+          className="flex-1 bg-zinc-100 dark:bg-zinc-800/60 rounded-full px-4 py-2 text-zinc-400 dark:text-zinc-500 text-sm text-left border border-zinc-200 dark:border-white/10"
+        >
+          What's on your mind?
         </Link>
       </div>
 

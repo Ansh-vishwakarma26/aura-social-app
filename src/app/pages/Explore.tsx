@@ -58,7 +58,7 @@ export const Explore = () => {
               </div>
             )) : suggested.map(u => (
               <div key={u.id} className="snap-start flex-shrink-0 w-36 bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl border border-zinc-200 dark:border-white/10 shadow-sm rounded-3xl p-4 flex flex-col items-center text-center transition-colors duration-300">
-                <Avatar src={u.avatar} size="lg" className="mb-3" />
+                <Avatar src={u.avatar || u.avatar_url} size="lg" className="mb-3" />
                 <Link to={`/profile/${u.username}`} className="font-semibold text-sm text-zinc-900 dark:text-white hover:underline line-clamp-1 w-full">{u.username}</Link>
                 <div className="text-xs text-zinc-500 mb-2 line-clamp-1 w-full">{u.fullName}</div>
                 <span className="px-2 py-1 mb-2 bg-gradient-to-r from-emerald-500/30 to-teal-500/30 border border-emerald-500/30 rounded-full text-xs font-bold text-emerald-400">{u.mbti}</span>

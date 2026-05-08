@@ -123,6 +123,9 @@
   * {
     @apply border-border outline-ring/50;
     caret-color: transparent;
+    /* Remove grey tap-highlight flash on iOS/Android */
+    -webkit-tap-highlight-color: transparent;
+    box-sizing: border-box;
   }
 
   body {
@@ -131,26 +134,37 @@
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
+    overscroll-behavior: none;
   }
 
   /* Re-enable selection and cursor for interactive text elements */
-  input, 
-  textarea, 
+  input,
+  textarea,
   [contenteditable="true"] {
     caret-color: auto;
     user-select: text;
     -webkit-user-select: text;
     -moz-user-select: text;
     -ms-user-select: text;
+    /* Prevent iOS font zoom on focus (must be >=16px) */
+    font-size: max(16px, 1em);
   }
 
-  /**
-  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
-  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
-  */
+  /* Eliminate 300ms tap delay on Android across all interactive elements */
+  button,
+  a,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  select,
+  label {
+    touch-action: manipulation;
+  }
 
   html {
     font-size: var(--font-size);
+    -webkit-text-size-adjust: 100%;
+    -webkit-overflow-scrolling: touch;
   }
 
   h1 {
@@ -190,8 +204,62 @@
   }
 
   input {
-    font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
   }
+}
+
+/* ─── Safe Area Utilities (iPhone notch / Dynamic Island / home bar) ──────── */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* Bottom content padded to clear the mobile nav AND the home bar */
+.pb-safe-nav {
+  padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+}
+.mb-safe-nav {
+  margin-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ─── Dynamic Viewport Height ─────────────────────────────────────────────── */
+/* dvh accounts for the browser address bar correctly on mobile. */
+.h-dvh {
+  height: 100dvh;
+  height: 100vh; /* fallback for older browsers */
+}
+.min-h-dvh {
+  min-height: 100dvh;
+  min-height: 100vh;
+}
+
+/* ─── Smooth Mobile Scroll Areas ──────────────────────────────────────────── */
+.scroll-smooth-mobile {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* ─── Hide Scrollbar (keep scrollable) ────────────────────────────────────── */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Chat Input Safe Area ────────────────────────────────────────────────── */
+.chat-input-bar {
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+}
+
+/* ─── Minimum Touch Target (iOS HIG: 44x44pt) ────────────────────────────── */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
-import { LogOut, User, Lock, ChevronRight, Moon, Shield, Zap, Camera, AlertCircle, CheckCircle2, Palette, Image as ImageIcon, Bell, Mail, BellOff, UserX, MicOff, Star, Activity, HelpCircle, AlertTriangle, FileText, ShieldBan } from "lucide-react";
+import { LogOut, User, Lock, X, ChevronRight, Moon, Shield, Zap, Camera, AlertCircle, CheckCircle2, Palette, Image as ImageIcon, Bell, Mail, BellOff, UserX, MicOff, Star, Activity, HelpCircle, AlertTriangle, FileText, ShieldBan } from "lucide-react";
 import { useTheme } from "next-themes";
 import { api } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -125,7 +125,7 @@ export const Settings = () => {
         activityStatusEnabled,
         avatarUrl,
         coverUrl,
-        coverImage: !coverUrl ? coverColor : undefined
+        coverImage: (!coverUrl && !coverPreview) ? coverColor : undefined
       });
       console.log("✅ Update successful:", data);
       updateUser(data.user);
@@ -161,11 +161,11 @@ export const Settings = () => {
   if (!user) { navigate('/login'); return null; }
 
   return (
-    <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl min-h-screen md:min-h-0 md:rounded-2xl md:border border-zinc-200 dark:border-white/10 pb-8 transition-colors duration-300">
-      <div className="sticky top-0 z-10 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200 dark:border-white/10 px-4 h-14 flex items-center justify-between">
+    <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-2xl min-h-dvh md:min-h-0 md:rounded-2xl md:border border-zinc-200 dark:border-white/10 pb-8 transition-colors duration-300">
+      <div className="sticky top-0 z-10 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200 dark:border-white/10 px-4 h-14 flex items-center justify-between shrink-0">
         <h1 className="font-bold text-xl text-zinc-900 dark:text-white">Settings</h1>
         <Button size="sm" onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save Changes"}
+          {saving ? "Saving…" : "Save"}
         </Button>
       </div>
 
@@ -182,7 +182,7 @@ export const Settings = () => {
         {/* Avatar */}
         <div className="flex flex-col items-center gap-3">
           <div className="relative group">
-            <Avatar src={avatarPreview || user.avatar} size="xl" className="w-24 h-24" />
+            <Avatar src={avatarPreview || user.avatar || user.avatar_url} size="xl" className="w-24 h-24" />
             <button
               onClick={() => fileRef.current?.click()}
               className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
@@ -448,8 +448,8 @@ export const Settings = () => {
 
       {/* Password Modal */}
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-sm border border-zinc-200 dark:border-white/10 shadow-2xl p-6">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-zinc-900 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm border border-zinc-200 dark:border-white/10 shadow-2xl p-6">
             <h3 className="font-bold text-lg text-zinc-900 dark:text-white mb-4">Change Password</h3>
             {passwordStatus && (
               <div className={cn("mb-4 p-3 rounded-xl text-sm border", passwordStatus.type === 'success' ? "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400" : "bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400")}>
@@ -471,14 +471,14 @@ export const Settings = () => {
 
       {/* Block & Mute Modal */}
       {blockMuteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setBlockMuteModal(null); }}>
-          <div className="bg-white dark:bg-zinc-800 rounded-2xl w-full max-w-sm max-h-[80vh] flex flex-col overflow-hidden border border-zinc-200 dark:border-white/10 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setBlockMuteModal(null); }}>
+          <div className="bg-white dark:bg-zinc-800 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm max-h-[80vh] flex flex-col overflow-hidden border border-zinc-200 dark:border-white/10 shadow-2xl">
             <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-white/10">
               <h3 className="font-bold text-lg capitalize text-zinc-900 dark:text-white">
                 {blockMuteModal === 'blocks' ? 'Blocked Accounts' : blockMuteModal === 'mutes' ? 'Muted Accounts' : 'Close Friends'}
               </h3>
-              <button onClick={() => setBlockMuteModal(null)} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-full hover:bg-zinc-100 dark:hover:bg-white/10">
-                <AlertCircle className="w-5 h-5" />
+              <button onClick={() => setBlockMuteModal(null)} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -495,7 +495,7 @@ export const Settings = () => {
                 <ul className="divide-y divide-zinc-100 dark:divide-white/10">
                   {blockMuteList.map((u: any) => (
                     <li key={u.id} className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
-                      <Avatar src={u.avatar} size="sm" className="w-10 h-10" />
+                      <Avatar src={u.avatar || u.avatar_url} size="sm" className="w-10 h-10" />
                       <div className="flex-1 min-w-0 text-left">
                         <p className="font-semibold text-sm text-zinc-900 dark:text-white truncate">{u.fullName}</p>
                         <p className="text-xs text-zinc-500 truncate">@{u.username}</p>
@@ -517,14 +517,14 @@ export const Settings = () => {
 
       {/* Static Pages Modal */}
       {staticModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setStaticModal(null); }}>
-          <div className="bg-white dark:bg-zinc-800 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden border border-zinc-200 dark:border-white/10 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) setStaticModal(null); }}>
+          <div className="bg-white dark:bg-zinc-800 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] flex flex-col overflow-hidden border border-zinc-200 dark:border-white/10 shadow-2xl">
             <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-white/10">
               <h3 className="font-bold text-lg capitalize text-zinc-900 dark:text-white">
                 {staticModal === 'help' ? 'Help Center' : staticModal === 'report' ? 'Report a Problem' : 'Terms & Policies'}
               </h3>
-              <button onClick={() => setStaticModal(null)} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-full hover:bg-zinc-100 dark:hover:bg-white/10">
-                <AlertCircle className="w-5 h-5" />
+              <button onClick={() => setStaticModal(null)} className="p-2 -mr-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed space-y-4">

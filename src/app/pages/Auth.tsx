@@ -19,6 +19,7 @@ const Field = ({ label, type = "text", placeholder, value, onChange, icon, autoC
         onChange={onChange}
         autoComplete={autoComplete}
         required
+        style={{ fontSize: '16px' }}  // Prevents iOS Safari from zooming in on focus
         className={`w-full ${icon ? 'pl-9' : 'pl-3'} pr-3 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm transition-colors`}
       />
     </div>
@@ -60,10 +61,10 @@ export const Login = () => {
           <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
       )}
-      <form className="space-y-4" onSubmit={handleSubmit} autoComplete="off">
-        <Field label="Email" type="email" placeholder="your@email.com" value={email} onChange={(e: any) => setEmail(e.target.value)} icon={<Mail className="w-4 h-4" />} autoComplete="off" />
-        <Field label="Password" type="password" placeholder="••••••••" value={password} onChange={(e: any) => setPassword(e.target.value)} icon={<Lock className="w-4 h-4" />} autoComplete="new-password" />
-        <Button className="w-full mt-2" type="submit" size="lg" disabled={loading}>
+      <form className="space-y-4" onSubmit={handleSubmit} autoComplete="on">
+        <Field label="Email" type="email" placeholder="your@email.com" value={email} onChange={(e: any) => setEmail(e.target.value)} icon={<Mail className="w-4 h-4" />} autoComplete="email" />
+        <Field label="Password" type="password" placeholder="••••••••" value={password} onChange={(e: any) => setPassword(e.target.value)} icon={<Lock className="w-4 h-4" />} autoComplete="current-password" />
+        <Button className="w-full mt-2 min-h-[44px]" type="submit" size="lg" disabled={loading}>
           {loading ? "Signing in…" : "Log In"}
         </Button>
       </form>
@@ -124,12 +125,13 @@ export const Signup = () => {
           <select
             value={form.mbti}
             onChange={set("mbti")}
+            style={{ fontSize: '16px' }}  // Prevents iOS Safari zoom
             className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm transition-colors"
           >
             {MBTI_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <Button className="w-full mt-2" type="submit" size="lg" disabled={loading}>
+        <Button className="w-full mt-2 min-h-[44px]" type="submit" size="lg" disabled={loading}>
           {loading ? "Creating…" : "Create Account"}
         </Button>
       </form>

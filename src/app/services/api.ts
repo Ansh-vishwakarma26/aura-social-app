@@ -12,15 +12,32 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
 
   const url = `${API_URL}${endpoint}`;
-  console.log(`🌐 API Request: ${options.method || 'GET'} ${url}`);
-  const res = await fetch(url, { ...options, headers });
+
+  // Abort after 15 seconds so the app never hangs indefinitely
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  let res: Response;
+  try {
+    res = await fetch(url, { ...options, headers, signal: controller.signal });
+  } catch (err: any) {
+    if (err.name === 'AbortError') throw new Error('Request timed out. Please check your connection.');
+    throw new Error('Network error. Is the server running?');
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  // Auto-clear stale token on 401 (expired / invalid JWT)
+  if (res.status === 401) {
+    localStorage.removeItem('aura_token');
+  }
+
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {
       const err = await res.json();
       message = err.message || message;
     } catch {
-      // If response is not JSON, it might be a proxy error (e.g. backend server down)
       if (res.status === 500 || res.status === 504 || res.status === 502) {
         message = 'Server connection failed. Is the backend running?';
       } else {
